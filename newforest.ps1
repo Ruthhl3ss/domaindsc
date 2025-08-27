@@ -25,7 +25,12 @@ Configuration NewForest {
     [Parameter(Mandatory = $true)]
     [ValidateNotNullOrEmpty()]
     [System.Management.Automation.PSCredential]
-    $Credential
+    $Credential,
+
+    [Parameter(Mandatory = $true)]
+    [ValidateNotNullOrEmpty()]
+    [string]
+    $DomainName
   )
 
   Import-DscResource -ModuleName PSDesiredStateConfiguration
@@ -33,24 +38,51 @@ Configuration NewForest {
 
   node 'localhost'
   {
-    WindowsFeature 'ADDS'
+    WindowsFeature InstallADDS
     {
       Name   = 'AD-Domain-Services'
       Ensure = 'Present'
     }
 
-    WindowsFeature 'RSAT'
+    WindowsFeature InstallDNS
+    {
+      Ensure = 'Present'
+      Name = 'DNS'
+    }
+
+    WindowsFeature InstallRSAT
     {
       Name   = 'RSAT-AD-PowerShell'
       Ensure = 'Present'
     }
 
-    ADDomain 'contoso.com'
+    WindowsFeature InstallDNSTools
     {
-      DomainName                    = 'contoso.com'
+      Ensure = 'Present'
+      Name = 'RSAT-DNS-Server'
+      DependsOn = '[WindowsFeature]InstallDNS'
+    }
+
+    WindowsFeature InstallADDSTools
+    {
+      Ensure = 'Present'
+      Name = 'RSAT-ADDS-Tools'
+      DependsOn = '[WindowsFeature]InstallADDS'
+    }
+
+    ADDomain CreateADForest
+    {
+      DomainName                    = $DomainName
       Credential                    = $Credential
       SafemodeAdministratorPassword = $Credential
       ForestMode                    = 'WinThreshold'
+      DependsOn = '[WindowsFeature]InstallDNS', '[WindowsFeature]InstallADDS', '[WindowsFeature]InstallADDSTools', '[WindowsFeature]InstallDNSTools', '[WindowsFeature]InstallRSAT'
+    }
+
+    PendingReboot RebootAfterCreatingADForest
+    {
+      Name = 'RebootAfterCreatingADForest'
+      DependsOn = "[ADDomain]CreateADForest"
     }
   }
 }
