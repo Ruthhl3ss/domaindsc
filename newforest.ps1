@@ -78,11 +78,5 @@ Configuration NewForest {
       ForestMode                    = 'WinThreshold'
       DependsOn = '[WindowsFeature]InstallDNS', '[WindowsFeature]InstallADDS', '[WindowsFeature]InstallADDSTools', '[WindowsFeature]InstallDNSTools', '[WindowsFeature]InstallRSAT'
     }
-
-    PendingReboot RebootAfterCreatingADForest
-    {
-      Name = 'RebootAfterCreatingADForest'
-      DependsOn = "[ADDomain]CreateADForest"
-    }
   }
 }
