@@ -26,9 +26,7 @@ Configuration deploy_forest {
     $Credential,
 
     [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [System.Management.Automation.PSCredential]
-    $SafeModePassword
+    [PSCredential]$SafemodePassword
   )
 
   Import-DscResource -ModuleName PSDesiredStateConfiguration
@@ -52,7 +50,7 @@ Configuration deploy_forest {
     {
       DomainName                    = 'test.local'
       Credential                    = $Credential
-      SafemodeAdministratorPassword = $Credential
+      SafemodeAdministratorPassword = $SafemodePassword
       ForestMode                    = 'WinThreshold'
     }
   }
