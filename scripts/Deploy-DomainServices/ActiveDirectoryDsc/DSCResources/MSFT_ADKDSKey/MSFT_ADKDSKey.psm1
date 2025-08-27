@@ -1,10 +1,13 @@
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+$resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+$modulesFolderPath = Join-Path -Path $resourceModulePath -ChildPath 'Modules'
 
-$script:localizationModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
-Import-Module -Name (Join-Path -Path $script:localizationModulePath -ChildPath 'ActiveDirectoryDsc.Common.psm1')
+$aDCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
+Import-Module -Name $aDCommonModulePath
 
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_ADKDSKey'
+$dscResourceCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'DscResource.Common'
+Import-Module -Name $dscResourceCommonModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 <#
     .SYNOPSIS
@@ -80,7 +83,7 @@ function Get-TargetResource
     {
         $kdsRootKey = $kdsRootKeys.GetEnumerator() |
             Where-Object -FilterScript {
-                [DateTime]::Parse($_.EffectiveTime) -eq $effectiveTimeObject
+                $_.EffectiveTime -eq $effectiveTimeObject
             }
     }
 
@@ -104,7 +107,7 @@ function Get-TargetResource
         elseif ($kdsRootKey)
         {
             $targetResource['Ensure'] = 'Present'
-            $targetResource['EffectiveTime'] = ([DateTime]::Parse($kdsRootKey.EffectiveTime)).ToString()
+            $targetResource['EffectiveTime'] = $kdsRootKey.EffectiveTime.ToString('o')
             $targetResource['CreationTime'] = $kdsRootKey.CreationTime
             $targetResource['KeyId'] = $kdsRootKey.KeyId
             $targetResource['DistinguishedName'] = 'CN={0},CN=Master Root Keys,CN=Group Key Distribution Service,CN=Services,CN=Configuration,{1}' -f

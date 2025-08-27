@@ -2,15 +2,18 @@
 [System.Diagnostics.CodeAnalysis.SuppressMessageAttribute("PSAvoidUsingPlainTextForPassword", "PasswordAuthentication")]
 param ()
 
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+$resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+$modulesFolderPath = Join-Path -Path $resourceModulePath -ChildPath 'Modules'
 
-$script:localizationModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
-Import-Module -Name (Join-Path -Path $script:localizationModulePath -ChildPath 'ActiveDirectoryDsc.Common.psm1')
+$aDCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
+Import-Module -Name $aDCommonModulePath
+
+$dscResourceCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'DscResource.Common'
+Import-Module -Name $dscResourceCommonModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 $script:dscResourceName = [System.IO.Path]::GetFileNameWithoutExtension($MyInvocation.MyCommand.Name)
-
-$script:localizedData = Get-LocalizedData -ResourceName $script:dscResourceName
 
 # Import a property map that maps the DSC resource parameters to the Active Directory user attributes.
 $adPropertyMapPath = Join-Path -Path $PSScriptRoot -ChildPath "$($script:dscResourceName).PropertyMap.psd1"
@@ -37,9 +40,9 @@ $adPropertyMap = (Import-PowerShellDataFile -Path $adPropertyMapPath).Parameters
             Name                          | Module
             ------------------------------|--------------------------
             Get-ADUser                    | ActiveDirectory
-            Assert-Module                 | ActiveDirectoryDsc.Common
+            Assert-Module                 | DscResource.Common
+            New-InvalidOperationException | DscResource.Common
             Get-ADCommonParameters        | ActiveDirectoryDsc.Common
-            New-InvalidOperationException | ActiveDirectoryDsc.Common
             Get-ADObjectParentDN          | ActiveDirectoryDsc.Common
             Get-MD5HashString             | MSFT_ADUser
 #>
@@ -381,6 +384,21 @@ function Get-TargetResource
         be removed. The property ThumbnailPhoto will always return the image as a Base64-encoded string even if the
         configuration specified a file path.
 
+    .PARAMETER AdminDescription
+        Specifies the description displayed on admin screens. Can be set to User_ to filter out an user from
+        Entra ID Connect synchronization.
+
+    .PARAMETER PhoneticDisplayName
+        The phonetic display name of an object. In the absence of a phonetic display name, the existing display name
+        is used. (ldapDisplayName 'msDS-PhoneticDisplayName').
+
+    .PARAMETER PreferredLanguage
+        The preferred written or spoken language for a person. For Microsoft 365, should follow ISO 639-1 Code, for example, en-US.
+
+    .PARAMETER SimpleDisplayName
+        Specifies the printable display name for an object. Can be set to a different display name to be used
+        externally. (ldapDisplayName 'displayNamePrintable').
+
     .NOTES
         Used Functions:
             Name                   | Module
@@ -692,7 +710,27 @@ function Test-TargetResource
 
         [Parameter()]
         [System.String]
-        $ThumbnailPhoto
+        $ThumbnailPhoto,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $AdminDescription,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $PhoneticDisplayName,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $PreferredLanguage,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $SimpleDisplayName
     )
 
     <#
@@ -1065,6 +1103,21 @@ function Test-TargetResource
         be removed. The property ThumbnailPhoto will always return the image as a Base64-encoded string even if the
         configuration specified a file path.
 
+    .PARAMETER AdminDescription
+        Specifies the description displayed on admin screens. Can be set to User_ to filter out an user from
+        Entra ID Connect synchronization.
+
+    .PARAMETER PhoneticDisplayName
+        The phonetic display name of an object. In the absence of a phonetic display name, the existing display name
+        is used. (ldapDisplayName 'msDS-PhoneticDisplayName').
+
+    .PARAMETER PreferredLanguage
+        The preferred written or spoken language for a person. For Microsoft 365, should follow ISO 639-1 Code, for example, en-US.
+
+    .PARAMETER SimpleDisplayName
+        Specifies the printable display name for an object. Can be set to a different display name to be used
+        externally. (ldapDisplayName 'displayNamePrintable').
+
     .NOTES
         Used Functions:
             Name                   | Module
@@ -1385,7 +1438,27 @@ function Set-TargetResource
 
         [Parameter()]
         [System.String]
-        $ThumbnailPhoto
+        $ThumbnailPhoto,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $AdminDescription,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $PhoneticDisplayName,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $PreferredLanguage,
+
+        [Parameter()]
+        [ValidateNotNull()]
+        [System.String]
+        $SimpleDisplayName
     )
 
     <#
@@ -1735,6 +1808,12 @@ function Set-TargetResource
     .PARAMETER IgnoredArguments
         Sets the rest of the arguments that are not passed into the this
         function.
+
+    .NOTES
+        Used Functions:
+            Name                         | Module
+            -----------------------------|--------------------------
+            New-InvalidArgumentException | DscResource.Common
 #>
 function Assert-Parameters
 {
@@ -1830,6 +1909,12 @@ function Get-MD5HashString
 
     .OUTPUTS
         Returns a byte array of the image specified in the parameter ThumbnailPhoto.
+
+    .NOTES
+        Used Functions:
+            Name                          | Module
+            ------------------------------|--------------------------
+            New-InvalidOperationException | DscResource.Common
 #>
 function Get-ThumbnailByteArray
 {
@@ -1848,7 +1933,7 @@ function Get-ThumbnailByteArray
         if (Test-Path -Path $ThumbnailPhoto)
         {
             Write-Verbose -Message ($script:localizedData.LoadingThumbnailFromFile -f $ThumbnailPhoto)
-            $thumbnailPhotoAsByteArray = Get-Content -Path $ThumbnailPhoto -Encoding Byte
+            $thumbnailPhotoAsByteArray = Get-ByteContent -Path $ThumbnailPhoto
         }
         else
         {
@@ -1879,6 +1964,13 @@ function Get-ThumbnailByteArray
     .OUTPUTS
         Returns $null if the thumbnail photos are the same, or a hashtable with
         the hashes if the thumbnail photos do not match.
+
+    .NOTES
+        Used Functions:
+            Name                          | Module
+            ------------------------------|--------------------------
+            Get-MD5HashString             | MSFT_ADUser
+            Get-ThumbnailByteArray        | MSFT_ADUser
 #>
 function Compare-ThumbnailPhoto
 {

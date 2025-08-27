@@ -1,10 +1,13 @@
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+$resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+$modulesFolderPath = Join-Path -Path $resourceModulePath -ChildPath 'Modules'
 
-$script:localizationModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
-Import-Module -Name (Join-Path -Path $script:localizationModulePath -ChildPath 'ActiveDirectoryDsc.Common.psm1')
+$aDCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
+Import-Module -Name $aDCommonModulePath
 
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_ADObjectPermissionEntry'
+$dscResourceCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'DscResource.Common'
+Import-Module -Name $dscResourceCommonModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 <#
     .SYNOPSIS
@@ -64,7 +67,7 @@ function Get-TargetResource
         $InheritedObjectType
     )
 
-    Assert-ADPSDrive
+    $ADDrivePSPath = Get-ADDrivePSPath
 
     # Return object, by default representing an absent ace
     $returnValue = @{
@@ -81,7 +84,7 @@ function Get-TargetResource
     try
     {
         # Get the current acl
-        $acl = Get-Acl -Path "AD:$Path" -ErrorAction Stop
+        $acl = Get-Acl -Path ($ADDrivePSPath + $Path) -ErrorAction Stop
     }
     catch [System.Management.Automation.ItemNotFoundException]
     {
@@ -204,10 +207,10 @@ function Set-TargetResource
         $InheritedObjectType
     )
 
-    Assert-ADPSDrive
+    $ADDrivePSPath = Get-ADDrivePSPath
 
     # Get the current acl
-    $acl = Get-Acl -Path "AD:$Path"
+    $acl = Get-Acl -Path ($ADDrivePSPath + $Path)
 
     if ($Ensure -eq 'Present')
     {
@@ -252,7 +255,7 @@ function Set-TargetResource
 
     # Set the updated acl to the object
     $acl |
-        Set-Acl -Path "AD:$Path"
+        Set-Acl -Path ($ADDrivePSPath + $Path)
 }
 
 <#
@@ -369,4 +372,28 @@ function Test-TargetResource
     }
 
     return $returnValue
+}
+
+<#
+    .SYNOPSIS
+        Returns this computers's full PSPath for the AD Drive.
+
+    .DESCRIPTION
+        This is used to retrieve the full PSPath for the AD Drive, which varies between operating systems.
+
+#>
+function Get-ADDrivePSPath
+{
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param ()
+
+    # Need to use the full PSPath to avoid issues when escaping paths - https://github.com/dsccommunity/ActiveDirectoryDsc/issues/675
+    # The full PSPath varies between operating systems, so we obtain it dynamically - https://github.com/dsccommunity/ActiveDirectoryDsc/issues/724
+
+    Assert-ADPSDrive
+
+    $adDrivePSPath = (Get-Item -Path 'AD:').PSPath
+    Write-Verbose -Message ($script:localizedData.RetrievedADDrivePSPath -f $adDrivePSPath)
+    return $adDrivePSPath
 }

@@ -1,10 +1,13 @@
-$script:resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
-$script:modulesFolderPath = Join-Path -Path $script:resourceModulePath -ChildPath 'Modules'
+$resourceModulePath = Split-Path -Path (Split-Path -Path $PSScriptRoot -Parent) -Parent
+$modulesFolderPath = Join-Path -Path $resourceModulePath -ChildPath 'Modules'
 
-$script:localizationModulePath = Join-Path -Path $script:modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
-Import-Module -Name (Join-Path -Path $script:localizationModulePath -ChildPath 'ActiveDirectoryDsc.Common.psm1')
+$aDCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'ActiveDirectoryDsc.Common'
+Import-Module -Name $aDCommonModulePath
 
-$script:localizedData = Get-LocalizedData -ResourceName 'MSFT_ADDomain'
+$dscResourceCommonModulePath = Join-Path -Path $modulesFolderPath -ChildPath 'DscResource.Common'
+Import-Module -Name $dscResourceCommonModulePath
+
+$script:localizedData = Get-LocalizedData -DefaultUICulture 'en-US'
 
 <#
     .SYNOPSIS
@@ -27,15 +30,20 @@ $script:localizedData = Get-LocalizedData -ResourceName 'MSFT_ADDomain'
     .PARAMETER ParentDomainName
         Fully qualified domain name (FQDN) of the parent domain.
 
+    .PARAMETER DomainType
+        When installing a new domain, specifies whether it is a new domain tree in an existing forest
+        ('TreeDomain'), or a child of an existing domain ('ChildDomain'). Only used when installing a
+        new domain. Default value is 'ChildDomain'.
+
     .NOTES
         Used Functions:
             Name                           | Module
             -------------------------------|--------------------------
-            Get-ADDomain                   | ActiveDirectory
             Get-ADForest                   | ActiveDirectory
-            Assert-Module                  | ActiveDirectoryDsc.Common
-            Resolve-DomainFQDN             | ActiveDirectoryDsc.Common
-            New-InvalidOperationException  | ActiveDirectoryDsc.Common
+            Assert-Module                  | DscResource.Common
+            New-InvalidOperationException  | DscResource.Common
+            Resolve-DomainFQDN             | MSFT_ADDomain
+            Get-DomainObject               | ActiveDirectoryDsc.Common
             ConvertTo-DeploymentForestMode | ActiveDirectoryDsc.Common
             ConvertTo-DeploymentDomainMode | ActiveDirectoryDsc.Common
 #>
@@ -59,10 +67,20 @@ function Get-TargetResource
         [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
-        $ParentDomainName
+        $ParentDomainName,
+
+        [Parameter()]
+        [ValidateSet('ChildDomain', 'TreeDomain')]
+        [System.String]
+        $DomainType = 'ChildDomain'
     )
 
     Assert-Module -ModuleName 'ADDSDeployment' -ImportModule
+
+    $typeName = 'Microsoft.DirectoryServices.Deployment.Types.ForestMode'
+
+    Add-TypeAssembly -AssemblyName 'Microsoft.DirectoryServices.Deployment.Types' -TypeName $typeName
+
     $domainFQDN = Resolve-DomainFQDN -DomainName $DomainName -ParentDomainName $ParentDomainName
 
     # If the domain has been installed then the Netlogon SysVol registry item will exist.
@@ -89,48 +107,7 @@ function Get-TargetResource
 
         Write-Verbose ($script:localizedData.QueryDomain -f $domainFQDN)
 
-        $retries = 0
-        $maxRetries = 15
-        $retryIntervalInSeconds = 30
-
-        do
-        {
-            $domainFound = $true
-            try
-            {
-                $domain = Get-ADDomain -Identity $domainFQDN -Server localhost -ErrorAction Stop
-            }
-            catch [Microsoft.ActiveDirectory.Management.ADServerDownException], `
-                [System.Security.Authentication.AuthenticationException], `
-                [System.InvalidOperationException], `
-                [System.ArgumentException]
-            {
-                Write-Verbose ($script:localizedData.ADServerNotReady -f $domainFQDN)
-                $domainFound = $false
-                # will fall into the retry mechanism.
-            }
-            catch
-            {
-                $errorMessage = $script:localizedData.GetAdDomainUnexpectedError -f $domainFQDN
-                New-InvalidOperationException -Message $errorMessage -ErrorRecord $_
-            }
-
-            if (-not $domainFound)
-            {
-                $retries++
-
-                Write-Verbose ($script:localizedData.RetryingGetADDomain -f
-                    $retries, $maxRetries, $retryIntervalInSeconds)
-
-                Start-Sleep -Seconds $retryIntervalInSeconds
-            }
-        } while ((-not $domainFound) -and $retries -lt $maxRetries)
-
-        if ($retries -eq $maxRetries)
-        {
-            $errorMessage = $script:localizedData.MaxDomainRetriesReachedError -f $domainFQDN
-            New-InvalidOperationException -Message $errorMessage
-        }
+        $domain = Get-DomainObject -Identity $domainFQDN -Server localhost -ErrorOnUnexpectedExceptions -ErrorOnMaxRetries -Verbose
     }
     else
     {
@@ -163,6 +140,7 @@ function Get-TargetResource
             ParentDomainName              = $domain.ParentDomain
             DomainNetBiosName             = $domain.NetBIOSName
             DnsDelegationCredential       = $null
+            DomainType                    = $DomainType
             DatabasePath                  = $serviceNTDS.'DSA Working Directory'
             LogPath                       = $serviceNTDS.'Database log files path'
             SysvolPath                    = $serviceNETLOGON.SysVol -replace '\\sysvol$', ''
@@ -182,6 +160,7 @@ function Get-TargetResource
             ParentDomainName              = $ParentDomainName
             DomainNetBiosName             = $null
             DnsDelegationCredential       = $null
+            DomainType                    = $DomainType
             DatabasePath                  = $null
             LogPath                       = $null
             SysvolPath                    = $null
@@ -223,6 +202,11 @@ function Get-TargetResource
     .PARAMETER DnsDelegationCredential
         Credential used for creating DNS delegation.
 
+    .PARAMETER DomainType
+        When installing a new domain, specifies whether it is a new domain tree in an existing forest
+        ('TreeDomain'), or a child of an existing domain ('ChildDomain'). Only used when installing a
+        new domain. Default value is 'ChildDomain'.
+
     .PARAMETER DatabasePath
         Path to a directory that contains the domain database.
 
@@ -242,7 +226,7 @@ function Get-TargetResource
         Used Functions:
             Name               | Module
             -------------------|--------------------------
-            Resolve-DomainFQDN | ActiveDirectoryDsc.Common
+            Resolve-DomainFQDN | MSFT_ADDomain
 #>
 function Test-TargetResource
 {
@@ -277,6 +261,11 @@ function Test-TargetResource
         $DnsDelegationCredential,
 
         [Parameter()]
+        [ValidateSet('ChildDomain', 'TreeDomain')]
+        [System.String]
+        $DomainType = 'ChildDomain',
+
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
         $DatabasePath,
@@ -292,12 +281,12 @@ function Test-TargetResource
         $SysvolPath,
 
         [Parameter()]
-        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold')]
+        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold', 'Win2025')]
         [System.String]
         $ForestMode,
 
         [Parameter()]
-        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold')]
+        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold', 'Win2025')]
         [System.String]
         $DomainMode
     )
@@ -364,6 +353,11 @@ function Test-TargetResource
     .PARAMETER DnsDelegationCredential
         Credential used for creating DNS delegation.
 
+    .PARAMETER DomainType
+        When installing a new domain, specifies whether it is a new domain tree in an existing forest
+        ('TreeDomain'), or a child of an existing domain ('ChildDomain'). Only used when installing a
+        new domain. Default value is 'ChildDomain'.
+
     .PARAMETER DatabasePath
         Path to a directory that contains the domain database.
 
@@ -425,6 +419,11 @@ function Set-TargetResource
         $DnsDelegationCredential,
 
         [Parameter()]
+        [ValidateSet('ChildDomain', 'TreeDomain')]
+        [System.String]
+        $DomainType = 'ChildDomain',
+
+        [Parameter()]
         [ValidateNotNullOrEmpty()]
         [System.String]
         $DatabasePath,
@@ -440,12 +439,12 @@ function Set-TargetResource
         $SysvolPath,
 
         [Parameter()]
-        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold')]
+        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold', 'Win2025')]
         [System.String]
         $ForestMode,
 
         [Parameter()]
-        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold')]
+        [ValidateSet('Win2008', 'Win2008R2', 'Win2012', 'Win2012R2', 'WinThreshold', 'Win2025')]
         [System.String]
         $DomainMode
     )
@@ -511,7 +510,7 @@ function Set-TargetResource
             $installADDSParameters['Credential'] = $Credential
             $installADDSParameters['NewDomainName'] = $DomainName
             $installADDSParameters['ParentDomainName'] = $ParentDomainName
-            $installADDSParameters['DomainType'] = 'ChildDomain'
+            $installADDSParameters['DomainType'] = $DomainType
 
             if ($PSBoundParameters.ContainsKey('DomainNetBiosName'))
             {
@@ -551,5 +550,46 @@ function Set-TargetResource
         $global:DSCMachineStatus = 1
     }
 } #end function Set-TargetResource
+
+<#
+    .SYNOPSIS
+        Assemble a fully qualified domain name.
+
+    .DESCRIPTION
+        The Resolve-DomainFQN function is used to assemble a fully qualified domain name by appending the domain name
+        to the parent domain name if the parent domain name has been specified. Otherwise the domain name is returned.
+
+    .PARAMETER DomainName
+        The domain name.
+
+    .PARAMETER ParentDomainName
+        The parent domain name.
+#>
+function Resolve-DomainFQDN
+{
+    [CmdletBinding()]
+    [OutputType([System.String])]
+    param
+    (
+        [Parameter(Mandatory = $true)]
+        [System.String]
+        $DomainName,
+
+        [Parameter()]
+        [System.String]
+        $ParentDomainName
+    )
+
+    if ($ParentDomainName)
+    {
+        $domainFQDN = '{0}.{1}' -f $DomainName, $ParentDomainName
+    }
+    else
+    {
+        $domainFQDN = $DomainName
+    }
+
+    return $domainFQDN
+}
 
 Export-ModuleMember -Function *-TargetResource
