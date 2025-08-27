@@ -13,6 +13,7 @@ Configuration Deploy-DomainServices
     Import-DscResource -ModuleName 'ActiveDirectoryDsc'
     Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'NetworkingDsc'
+    Import-DscResource -ModuleName 'DSCResource.Common'
 
     node 'localhost'
     {
