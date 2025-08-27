@@ -14,13 +14,6 @@ Configuration Deploy-DomainServices
     Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'NetworkingDsc'
 
-    # Create the NetBIOS name and domain credentials based on the domain FQDN
-    [String] $domainNetBIOSName = (Get-NetBIOSName -DomainFQDN $domainFQDN)
-    [System.Management.Automation.PSCredential] $domainCredential = New-Object System.Management.Automation.PSCredential ("${domainNetBIOSName}\$($adminCredential.UserName)", $adminCredential.Password)
-
-    $interface = Get-NetAdapter | Where-Object Name -Like "Ethernet*" | Select-Object -First 1
-    $interfaceAlias = $($interface.Name)
-
     node 'localhost'
     {
         WindowsFeature 'ADDS'
