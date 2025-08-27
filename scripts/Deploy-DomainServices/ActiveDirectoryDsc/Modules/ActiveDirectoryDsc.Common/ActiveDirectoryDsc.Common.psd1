@@ -22,9 +22,16 @@
 
     # Functions to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no functions to export.
     FunctionsToExport = @(
+        'New-InvalidArgumentException'
+        'New-InvalidOperationException'
+        'New-ObjectNotFoundException'
+        'New-InvalidResultException'
+        'Get-LocalizedData'
         'Start-ProcessWithTimeout'
+        'Assert-Module'
         'Test-DomainMember'
         'Get-DomainName'
+        'Resolve-DomainFQDN'
         'Get-ADObjectParentDN'
         'Assert-MemberParameters'
         'Remove-DuplicateMembers'
@@ -37,25 +44,21 @@
         'ConvertTo-DeploymentDomainMode'
         'Restore-ADCommonObject'
         'Get-ADDomainNameFromDistinguishedName'
-        'Set-ADCommonGroupMember'
-        'Get-DomainObject'
+        'Add-ADCommonGroupMember'
         'Get-DomainControllerObject'
         'Test-IsDomainController'
         'Convert-PropertyMapToObjectProperties'
         'Compare-ResourcePropertyState'
+        'Test-DscPropertyState'
         'Assert-ADPSDrive'
+        'Set-DscADComputer'
         'New-CimCredentialInstance'
         'Add-TypeAssembly'
         'Get-ADDirectoryContext'
         'Find-DomainController'
         'Get-CurrentUser'
         'Test-Password'
-        'Get-ByteContent'
-        'Get-ActiveDirectoryDomain'
-        'Get-ActiveDirectoryForest'
-        'Resolve-SamAccountName'
-        'Resolve-SecurityIdentifier'
-        'Resolve-MembersSecurityIdentifier'
+        'Test-PrincipalContextCredentials'
     )
 
     # Cmdlets to export from this module, for best performance, do not use wildcards and do not delete the entry, use an empty array if there are no cmdlets to export.
@@ -72,5 +75,6 @@
 
         PSData = @{
         } # End of PSData hashtable
+
     } # End of PrivateData hashtable
 }
