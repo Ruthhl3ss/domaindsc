@@ -42,7 +42,7 @@ Configuration domainconfig {
     Script GPOCentralStore
     {
       SetScript  = {
-        $PolicyDefinitions = "\\$DomainName\SYSVOL\$DomainName\Policies"
+        $PolicyDefinitions = "\\\\$DomainName\\SYSVOL\\$DomainName\\Policies"
         Copy-Item C:\Windows\PolicyDefinitions $PolicyDefinitions -Recurse -Force
       }
       GetScript  = { @{} }
@@ -86,7 +86,7 @@ Configuration domainconfig {
 
     DnsServerPrimaryZone 'AddPrimaryZone'
     {
-      Name = '0.10.in-addr.arpa'
+      Name = "$IPRange.in-addr.arpa"
     }
   }
 }
