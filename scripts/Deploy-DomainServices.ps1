@@ -1,5 +1,4 @@
-Configuration Deploy-DomainServices
-{
+Configuration Deploy-DomainServices {
     Param
     (
         [Parameter(Mandatory)]
@@ -13,6 +12,7 @@ Configuration Deploy-DomainServices
     Import-DscResource -ModuleName 'ActiveDirectoryDsc'
     Import-DscResource -ModuleName 'ComputerManagementDsc'
     Import-DscResource -ModuleName 'NetworkingDsc'
+    Import-DscResource -ModuleName 'DSCResource.Common'
 
     node 'localhost'
     {
@@ -27,6 +27,14 @@ Configuration Deploy-DomainServices
             Name   = 'RSAT-AD-PowerShell'
             Ensure = 'Present'
         }
+
+        WindowsFeature 'ADDSTools'
+        {
+            Ensure = 'Present'
+            Name = 'RSAT-ADDS-Tools'
+            DependsOn = '[WindowsFeature]ADDS'
+        }
+
 
         ADDomain 'createforest'
         {
