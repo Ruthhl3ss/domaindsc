@@ -21,9 +21,7 @@ Configuration deploy_forest {
   param
   (
     [Parameter(Mandatory = $true)]
-    [ValidateNotNullOrEmpty()]
-    [System.Management.Automation.PSCredential]
-    $Credential,
+    [PSCredential]$Credential,
 
     [Parameter(Mandatory = $true)]
     [PSCredential]$SafemodePassword
