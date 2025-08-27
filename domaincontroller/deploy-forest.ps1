@@ -12,8 +12,6 @@
 Updated author, copyright notice, and URLs.
 #>
 
-#Requires -Module ActiveDirectoryDsc
-
 <#
     .DESCRIPTION
         This configuration will create a new domain with a new forest and a forest
