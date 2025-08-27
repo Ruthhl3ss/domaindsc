@@ -52,7 +52,7 @@ Configuration deploy_forest {
     {
       DomainName                    = 'test.local'
       Credential                    = $Credential
-      SafemodeAdministratorPassword = $SafeModePassword
+      SafemodeAdministratorPassword = $Credential
       ForestMode                    = 'WinThreshold'
     }
   }
