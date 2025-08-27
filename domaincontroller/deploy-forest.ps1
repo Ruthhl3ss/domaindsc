@@ -19,7 +19,7 @@ Updated author, copyright notice, and URLs.
         This configuration will create a new domain with a new forest and a forest
         functional level of Server 2016.
 #>
-Configuration ADDomain_NewForest_Config {
+Configuration deploy_forest {
   param
   (
     [Parameter(Mandatory = $true)]
